@@ -1,0 +1,22 @@
+# Render Blueprint: the web app plus a managed Redis-compatible Key Value instance.
+# Deploy via Render dashboard → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: gogetthetickets
+    runtime: docker
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: gogetthetickets-redis
+          property: connectionString
+
+  - type: keyvalue
+    name: gogetthetickets-redis
+    plan: free
+    # Never evict keys under memory pressure: evicting a seat key would silently free a booked seat.
+    maxmemoryPolicy: noeviction
+    # Empty list = reachable only from other services in this Render account, not the internet.
+    ipAllowList: []
