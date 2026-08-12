@@ -1,0 +1,12 @@
+/* The design system's prototype runs in a fixed-size frame; the real app fills the window. */
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); overscroll-behavior: none; }
+.g-app { height: 100vh; height: 100dvh; }
+
+/* Keep the bottom nav and dock clear of the iPhone home indicator. */
+.g-bnav { padding-bottom: max(4px, env(safe-area-inset-bottom)); height: auto; min-height: 68px; }
+.g-dock { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}

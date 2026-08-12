@@ -1,31 +1,37 @@
 package com.satyansh.gogetthetickets.booking;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** HTTP layer: routing, JSON shape and status codes. The service is mocked. */
-@WebMvcTest(BookingController.class)
-class BookingControllerTest {
+import com.satyansh.gogetthetickets.auth.SecurityConfig;
+import com.satyansh.gogetthetickets.booking.dto.BookingResponse;
+import com.satyansh.gogetthetickets.catalog.dto.MovieResponse;
 
-	private static final String ALICE = """
-			{"user_id": "alice"}""";
+/** The HTTP contract: auth, status codes and error bodies. The service is mocked. */
+@WebMvcTest(value = BookingController.class, properties = "app.jwt.secret=test-secret-test-secret-test-secret-32")
+@Import(SecurityConfig.class)
+class BookingControllerTest {
 
 	@Autowired
 	private MockMvc mvc;
@@ -34,96 +40,86 @@ class BookingControllerTest {
 	private BookingService service;
 
 	@Test
-	void holdReturns201WithSnakeCaseSession() throws Exception {
-		when(service.hold("inception", "A1", "alice")).thenReturn(new Booking("s1", "inception", "A1", "alice",
-				BookingStatus.HELD, Instant.parse("2026-09-27T10:02:00Z")));
+	void holdingSeatsRequiresSignIn() throws Exception {
+		mvc.perform(post("/api/shows/42/holds").contentType(MediaType.APPLICATION_JSON).content("{\"seatIds\":[\"C7\"]}"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+	}
 
-		mvc.perform(post("/movies/inception/seats/A1/hold").contentType(MediaType.APPLICATION_JSON).content(ALICE))
+	@Test
+	void holdUsesTheSignedInUserAndReturns201() throws Exception {
+		when(service.hold(eq(7L), eq(42L), any())).thenReturn(sample("HELD"));
+
+		mvc.perform(post("/api/shows/42/holds").with(jwt().jwt(j -> j.subject("7")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"seatIds\":[\"C7\",\"C8\"]}"))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.session_id").value("s1"))
-				.andExpect(jsonPath("$.movie_id").value("inception"))
-				.andExpect(jsonPath("$.seat_id").value("A1"))
-				.andExpect(jsonPath("$.expires_at").value("2026-09-27T10:02:00Z"));
+				.andExpect(jsonPath("$.bookingId").value("GGTTEST123"))
+				.andExpect(jsonPath("$.seats[0].id").value("C7"));
+		verify(service).hold(7L, 42L, List.of("C7", "C8"));
 	}
 
 	@Test
-	void holdOnTakenSeatReturns409() throws Exception {
-		when(service.hold(any(), any(), any())).thenThrow(new SeatUnavailableException("A1"));
+	void takenSeatsAre409AndNamed() throws Exception {
+		when(service.hold(anyLong(), anyLong(), any())).thenThrow(new SeatsUnavailableException(List.of("C8")));
 
-		mvc.perform(post("/movies/inception/seats/A1/hold").contentType(MediaType.APPLICATION_JSON).content(ALICE))
+		mvc.perform(post("/api/shows/42/holds").with(jwt().jwt(j -> j.subject("7")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"seatIds\":[\"C7\",\"C8\"]}"))
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.error").value("seat A1 is already taken"));
+				.andExpect(jsonPath("$.code").value("SEATS_UNAVAILABLE"))
+				.andExpect(jsonPath("$.error").value("Seat C8 was just taken by someone else"))
+				.andExpect(jsonPath("$.details.seats[0]").value("C8"));
 	}
 
 	@Test
-	void blankUserIdReturns400() throws Exception {
-		mvc.perform(post("/movies/inception/seats/A1/hold").contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"user_id": " "}"""))
+	void tooManySeatsIsAValidationError() throws Exception {
+		mvc.perform(post("/api/shows/42/holds").with(jwt().jwt(j -> j.subject("7")))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"seatIds\":[\"A1\",\"A2\",\"A3\",\"A4\",\"A5\",\"A6\",\"A7\",\"A8\",\"A9\",\"A10\",\"A11\"]}"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("user_id is required"));
+				.andExpect(jsonPath("$.fields.seatIds").value("You can book up to 10 seats at a time"));
 	}
 
 	@Test
-	void missingBodyReturns400() throws Exception {
-		mvc.perform(post("/movies/inception/seats/A1/hold").contentType(MediaType.APPLICATION_JSON))
+	void paymentNeedsAnIdempotencyKey() throws Exception {
+		mvc.perform(post("/api/bookings/GGTTEST123/payments").with(jwt().jwt(j -> j.subject("7")))
+				.contentType(MediaType.APPLICATION_JSON).content(upiPayment()))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").exists());
+				.andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
 	}
 
 	@Test
-	void nonJsonBodyReturns415NotServerError() throws Exception {
-		mvc.perform(post("/movies/inception/seats/A1/hold").contentType(MediaType.APPLICATION_FORM_URLENCODED)
-				.content("user_id=alice"))
-				.andExpect(status().isUnsupportedMediaType())
-				.andExpect(jsonPath("$.error").exists());
+	void declinedPaymentIs402AndStillReturnsTheBooking() throws Exception {
+		when(service.pay(eq(7L), eq("GGTTEST123"), eq("k1"), any()))
+				.thenReturn(new BookingService.PaymentOutcome(sample("HELD"), false, "DEMO_DECLINED"));
+
+		mvc.perform(post("/api/bookings/GGTTEST123/payments").with(jwt().jwt(j -> j.subject("7")))
+				.header("Idempotency-Key", "k1").contentType(MediaType.APPLICATION_JSON).content(upiPayment()))
+				.andExpect(status().isPaymentRequired())
+				.andExpect(jsonPath("$.code").value("PAYMENT_DECLINED"))
+				.andExpect(jsonPath("$.details.status").value("HELD"));
 	}
 
 	@Test
-	void confirmBySomeoneElseReturns403() throws Exception {
-		when(service.confirm("s1", "alice")).thenThrow(new NotSessionOwnerException());
-
-		mvc.perform(put("/sessions/s1/confirm").contentType(MediaType.APPLICATION_JSON).content(ALICE))
-				.andExpect(status().isForbidden());
+	void bookingsListIsPrivate() throws Exception {
+		mvc.perform(get("/api/bookings")).andExpect(status().isUnauthorized());
 	}
 
-	@Test
-	void confirmReturnsConfirmedSession() throws Exception {
-		when(service.confirm("s1", "alice"))
-				.thenReturn(new Booking("s1", "inception", "A1", "alice", BookingStatus.CONFIRMED, null));
-
-		mvc.perform(put("/sessions/s1/confirm").contentType(MediaType.APPLICATION_JSON).content(ALICE))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.status").value("confirmed"));
+	private static String upiPayment() {
+		return "{\"method\":\"UPI\",\"email\":\"fan@example.com\",\"upiId\":\"fan@okbank\"}";
 	}
 
-	@Test
-	void releaseReturns204() throws Exception {
-		mvc.perform(delete("/sessions/s1").contentType(MediaType.APPLICATION_JSON).content(ALICE))
-				.andExpect(status().isNoContent());
-	}
-
-	@Test
-	void releaseOfExpiredSessionReturns404() throws Exception {
-		doThrow(new SessionNotFoundException()).when(service).release("s1", "alice");
-
-		mvc.perform(delete("/sessions/s1").contentType(MediaType.APPLICATION_JSON).content(ALICE))
-				.andExpect(status().isNotFound());
-	}
-
-	@Test
-	void listSeatsMarksConfirmedSeats() throws Exception {
-		when(service.listBookings("inception")).thenReturn(List.of(
-				new Booking("s1", "inception", "A1", "alice", BookingStatus.HELD, Instant.now()),
-				new Booking("s2", "inception", "B2", "bob", BookingStatus.CONFIRMED, null)));
-
-		mvc.perform(get("/movies/inception/seats"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[0].seat_id").value("A1"))
-				.andExpect(jsonPath("$[0].booked").value(true))
-				.andExpect(jsonPath("$[0].confirmed").value(false))
-				.andExpect(jsonPath("$[1].user_id").value("bob"))
-				.andExpect(jsonPath("$[1].confirmed").value(true));
+	private static BookingResponse sample(String status) {
+		MovieResponse movie = new MovieResponse("orbit-of-ashes", "Orbit of Ashes", "UA", 162, List.of("Sci-Fi"), List.of("English"),
+				List.of("IMAX"), LocalDate.of(2026, 9, 18), "NOW_SHOWING", 9.1, "61.5K", "...", null, null, null, 1,
+				new MovieResponse.Art("orbit", "IN IMAX", List.of("Orbit of", "Ashes"), new MovieResponse.Palette("#000", "#111", "#fff")), null);
+		return new BookingResponse("GGTTEST123", status, 42, movie, "Orion Multiplex: Lakeside", "Powai", "mumbai", "Audi 3",
+				LocalDate.of(2026, 9, 29), "19:40", Instant.parse("2026-09-29T14:10:00Z"), "English", "IMAX",
+				List.of(new BookingResponse.SeatLine("C7", "C", 7, "CLASSIC", BigDecimal.valueOf(180)),
+						new BookingResponse.SeatLine("C8", "C", 8, "CLASSIC", BigDecimal.valueOf(180))),
+				List.of(), BigDecimal.valueOf(360), BigDecimal.ZERO, BigDecimal.valueOf(360), BigDecimal.valueOf(60),
+				new BigDecimal("10.80"), BigDecimal.ZERO, new BigDecimal("430.80"), null, null, null,
+				Instant.parse("2026-09-29T13:00:00Z"), null, "ggt://ticket/GGTTEST123", BigDecimal.valueOf(360), false,
+				Instant.parse("2026-09-29T12:50:00Z"));
 	}
 
 }

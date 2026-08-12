@@ -4,11 +4,18 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** Starts a throwaway Redis in Docker and points the app at it. */
+/** Starts throwaway Postgres and Redis in Docker and points the app at them. */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
+
+	@Bean
+	@ServiceConnection
+	PostgreSQLContainer postgresContainer() {
+		return new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"));
+	}
 
 	@Bean
 	@ServiceConnection(name = "redis")

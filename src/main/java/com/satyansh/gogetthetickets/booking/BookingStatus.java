@@ -1,11 +1,21 @@
 package com.satyansh.gogetthetickets.booking;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
+/**
+ * Lifecycle:
+ *
+ * <pre>
+ * HELD ──pay──▶ CONFIRMED ──cancel──▶ CANCELLED
+ *  │
+ *  ├─ timer runs out ─▶ EXPIRED
+ *  └─ user picks other seats ─▶ RELEASED
+ * </pre>
+ *
+ * A failed payment leaves the booking HELD, so the user can retry until the timer runs out.
+ */
 public enum BookingStatus {
-	@JsonProperty("held")
 	HELD,
-
-	@JsonProperty("confirmed")
-	CONFIRMED
+	CONFIRMED,
+	CANCELLED,
+	EXPIRED,
+	RELEASED
 }

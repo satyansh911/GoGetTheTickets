@@ -1,4 +1,5 @@
 # Render Blueprint: the web app plus a managed Redis-compatible Key Value instance.
+# PostgreSQL comes from Neon (free, doesn't expire); paste its connection details when Render asks.
 # Deploy via Render dashboard → New → Blueprint → pick this repo.
 services:
   - type: web
@@ -12,11 +13,20 @@ services:
           type: keyvalue
           name: gogetthetickets-redis
           property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # e.g. jdbc:postgresql://ep-xxx.aws.neon.tech/neondb?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
 
   - type: keyvalue
     name: gogetthetickets-redis
     plan: free
-    # Never evict keys under memory pressure: evicting a seat key would silently free a booked seat.
+    # Never evict keys under memory pressure: evicting a hold would free a seat mid-checkout.
     maxmemoryPolicy: noeviction
     # Empty list = reachable only from other services in this Render account, not the internet.
     ipAllowList: []

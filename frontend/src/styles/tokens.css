@@ -1,0 +1,157 @@
+/* Generated from the GoGetTheTickets design system tokens.json. Dark is the home theme. */
+@font-face { font-family: 'Sora'; src: url('./fonts/Sora-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Sora'; src: url('./fonts/Sora-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Sora'; src: url('./fonts/Sora-800.woff2') format('woff2'); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope-800.woff2') format('woff2'); font-weight: 800; font-style: normal; font-display: swap; }
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-overlay: 60;
+  --z-toast: 80;
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-display: Sora, Manrope, system-ui, sans-serif;
+  --font-text: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0b0f;
+  --surface-1: #15151b;
+  --surface-2: #1d1d25;
+  --surface-3: #282831;
+  --line: #2c2c36;
+  --line-strong: #6a6a78;
+  --ink: #f6f4ef;
+  --ink-muted: #aeadb8;
+  --ink-subtle: #8a8996;
+  --accent: #ffc53d;
+  --accent-hover: #ffd36b;
+  --accent-pressed: #e8ad24;
+  --on-accent: #1a1204;
+  --accent-text: #ffc53d;
+  --accent-soft: rgba(255,197,61,0.14);
+  --success: #4ade94;
+  --success-soft: rgba(74,222,148,0.13);
+  --warning: #ff9f45;
+  --warning-soft: rgba(255,159,69,0.14);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255,107,107,0.14);
+  --access: #6cb4ff;
+  --access-soft: rgba(108,180,255,0.14);
+  --inverse-surface: #f6f4ef;
+  --inverse-ink: #131318;
+  --inverse-success: #0d7a44;
+  --inverse-warning: #a34f00;
+  --inverse-danger: #c42e2e;
+  --scrim: rgba(5,5,8,0.72);
+  --hero-scrim: rgba(8,8,11,0.86);
+  --hero-ink: #f6f4ef;
+  --focus: #ffc53d;
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.45);
+  --shadow-3: 0 24px 64px rgba(0,0,0,0.6);
+  --glow-accent: 0 8px 28px rgba(255,197,61,0.32);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f6f2;
+  --surface-1: #ffffff;
+  --surface-2: #f0eee9;
+  --surface-3: #e5e2db;
+  --line: #e0ddd5;
+  --line-strong: #8c887d;
+  --ink: #131318;
+  --ink-muted: #55555f;
+  --ink-subtle: #64646f;
+  --accent: #f5b21c;
+  --accent-hover: #e3a10c;
+  --accent-pressed: #cf920a;
+  --on-accent: #1a1204;
+  --accent-text: #8a5a00;
+  --accent-soft: #fff1cc;
+  --success: #0d7a44;
+  --success-soft: #e2f4e9;
+  --warning: #a34f00;
+  --warning-soft: #fdeedf;
+  --danger: #c42e2e;
+  --danger-soft: #fbe6e4;
+  --access: #1c5fb0;
+  --access-soft: #e3eefb;
+  --inverse-surface: #1b1b21;
+  --inverse-ink: #f6f4ef;
+  --inverse-success: #4ade94;
+  --inverse-warning: #ff9f45;
+  --inverse-danger: #ff6b6b;
+  --scrim: rgba(19,19,24,0.48);
+  --hero-scrim: rgba(8,8,11,0.82);
+  --hero-ink: #f6f4ef;
+  --focus: #131318;
+  --shadow-1: 0 1px 2px rgba(19,19,24,0.08);
+  --shadow-2: 0 8px 24px rgba(19,19,24,0.10);
+  --shadow-3: 0 24px 64px rgba(19,19,24,0.18);
+  --glow-accent: 0 8px 24px rgba(245,178,28,0.35);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f7f6f2;
+    --surface-1: #ffffff;
+    --surface-2: #f0eee9;
+    --surface-3: #e5e2db;
+    --line: #e0ddd5;
+    --line-strong: #8c887d;
+    --ink: #131318;
+    --ink-muted: #55555f;
+    --ink-subtle: #64646f;
+    --accent: #f5b21c;
+    --accent-hover: #e3a10c;
+    --accent-pressed: #cf920a;
+    --on-accent: #1a1204;
+    --accent-text: #8a5a00;
+    --accent-soft: #fff1cc;
+    --success: #0d7a44;
+    --success-soft: #e2f4e9;
+    --warning: #a34f00;
+    --warning-soft: #fdeedf;
+    --danger: #c42e2e;
+    --danger-soft: #fbe6e4;
+    --access: #1c5fb0;
+    --access-soft: #e3eefb;
+    --inverse-surface: #1b1b21;
+    --inverse-ink: #f6f4ef;
+    --inverse-success: #4ade94;
+    --inverse-warning: #ff9f45;
+    --inverse-danger: #ff6b6b;
+    --scrim: rgba(19,19,24,0.48);
+    --hero-scrim: rgba(8,8,11,0.82);
+    --hero-ink: #f6f4ef;
+    --focus: #131318;
+    --shadow-1: 0 1px 2px rgba(19,19,24,0.08);
+    --shadow-2: 0 8px 24px rgba(19,19,24,0.10);
+    --shadow-3: 0 24px 64px rgba(19,19,24,0.18);
+    --glow-accent: 0 8px 24px rgba(245,178,28,0.35);
+  }
+}
