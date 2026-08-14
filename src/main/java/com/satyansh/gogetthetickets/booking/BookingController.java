@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -25,7 +24,6 @@ import com.satyansh.gogetthetickets.booking.dto.HoldRequest;
 import com.satyansh.gogetthetickets.booking.dto.ItemsRequest;
 import com.satyansh.gogetthetickets.booking.dto.PaymentRequest;
 import com.satyansh.gogetthetickets.common.ApiError;
-import com.satyansh.gogetthetickets.common.RequestRejectedException;
 
 import jakarta.validation.Valid;
 
@@ -81,13 +79,8 @@ public class BookingController {
 	 * carries the booking in {@code details}: the seats stay held for a retry.
 	 */
 	@PostMapping("/bookings/{id}/payments")
-	public ResponseEntity<?> pay(@PathVariable String id, @RequestHeader(name = "Idempotency-Key", required = false) String key,
-			@Valid @RequestBody PaymentRequest request, @AuthenticationPrincipal Jwt jwt) {
-		if (key == null || key.isBlank() || key.length() > 80) {
-			throw new RequestRejectedException(HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED",
-					"An Idempotency-Key header (up to 80 characters) is required");
-		}
-		BookingService.PaymentOutcome outcome = service.pay(CurrentUser.id(jwt), id, key, request);
+	public ResponseEntity<?> pay(@PathVariable String id, @Valid @RequestBody PaymentRequest request, @AuthenticationPrincipal Jwt jwt) {
+		BookingService.PaymentOutcome outcome = service.pay(CurrentUser.id(jwt), id, request);
 		if (outcome.succeeded()) {
 			return ResponseEntity.ok(outcome.booking());
 		}

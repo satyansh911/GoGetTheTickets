@@ -203,54 +203,47 @@ public class BookingService {
 	}
 
 	/**
-	 * Charges the booking and, on success, turns the hold into sold seats.
-	 *
-	 * Idempotent per {@code idempotencyKey}: a retry with the same key (double click, network
-	 * retry) gets the first attempt's outcome instead of a second charge. A failed payment
-	 * leaves the seats held, so the user can retry with a new key.
+	 * Charges the booking and, on success, turns the held seats into sold seats.
+	 * A failed payment leaves the seats held, so the user can try again before the timer ends.
 	 */
 	@Transactional
-	public PaymentOutcome pay(long userId, String bookingId, String idempotencyKey, PaymentRequest request) {
-		Optional<Payment> earlier = payments.findByIdempotencyKey(idempotencyKey);
-		if (earlier.isPresent()) {
-			Payment p = earlier.get();
-			if (!p.getBookingId().equals(bookingId)) {
-				throw new RequestRejectedException(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED",
-						"This payment key was already used for another booking");
-			}
-			return new PaymentOutcome(mapper.toResponse(findOwned(userId, bookingId), null),
-					p.getStatus() == Payment.Status.SUCCEEDED, p.getFailureCode());
-		}
-
+	public PaymentOutcome pay(long userId, String bookingId, PaymentRequest request) {
+		// 1. Load the booking. If it's already paid (e.g. a double click), don't charge again.
 		Booking booking = findOwned(userId, bookingId);
 		if (booking.getStatus() == BookingStatus.CONFIRMED) {
 			return new PaymentOutcome(mapper.toResponse(booking, null), true, null);
 		}
+
+		// 2. Check the payment details and that the 10-minute hold hasn't run out.
 		validatePaymentDetails(request);
 		requireActiveHold(booking);
 
+		// 3. Check Redis still holds these seats for this booking.
 		long showId = booking.getShow().getId();
 		List<String> seatIds = booking.seatIds();
 		if (!holds.verifyAndExtend(showId, seatIds, bookingId, PAYMENT_WINDOW)) {
 			throw holdExpired();
 		}
 
+		// 4. Charge (a demo gateway here) and record the attempt.
 		String method = request.method().toUpperCase(Locale.ROOT);
 		PaymentGateway.Result result = gateway.charge(new PaymentGateway.Charge(bookingId, booking.getTotal(), method,
 				request.upiId(), "FAIL".equalsIgnoreCase(request.simulate())));
 		Instant now = clock.instant();
-		payments.save(new Payment(bookingId, idempotencyKey, method,
+		payments.save(new Payment(bookingId, method,
 				result.succeeded() ? Payment.Status.SUCCEEDED : Payment.Status.FAILED, booking.getTotal(),
 				result.failureCode(), now));
 		if (!result.succeeded()) {
 			return new PaymentOutcome(mapper.toResponse(booking, null), false, result.failureCode());
 		}
 
+		// 5. Save the sold seats. The (show, seat) primary key refuses a seat that's already sold.
 		for (String seatId : seatIds) {
 			bookedSeats.insert(showId, seatId, bookingId);
 		}
 		booking.confirm(now, request.email().trim());
-		// The seats are now in booked_seats; drop the Redis hold only once that is committed.
+
+		// 6. Once the database has committed, the Redis hold is no longer needed.
 		afterCommit(() -> holds.release(showId, seatIds, bookingId));
 		return new PaymentOutcome(mapper.toResponse(booking, null), true, null);
 	}

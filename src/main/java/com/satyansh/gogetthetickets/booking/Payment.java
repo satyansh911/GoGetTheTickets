@@ -11,11 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * One payment attempt. The client sends an Idempotency-Key per attempt; the unique key on
- * that column means a retried or double-clicked "Pay" is answered from this row instead of
- * charging again.
- */
+/** One payment attempt, successful or not, kept as a record of what happened. */
 @Entity
 @Table(name = "payments")
 public class Payment {
@@ -31,8 +27,6 @@ public class Payment {
 
 	private String bookingId;
 
-	private String idempotencyKey;
-
 	private String method;
 
 	@Enumerated(EnumType.STRING)
@@ -47,10 +41,8 @@ public class Payment {
 	protected Payment() {
 	}
 
-	public Payment(String bookingId, String idempotencyKey, String method, Status status, BigDecimal amount,
-			String failureCode, Instant createdAt) {
+	public Payment(String bookingId, String method, Status status, BigDecimal amount, String failureCode, Instant createdAt) {
 		this.bookingId = bookingId;
-		this.idempotencyKey = idempotencyKey;
 		this.method = method;
 		this.status = status;
 		this.amount = amount;

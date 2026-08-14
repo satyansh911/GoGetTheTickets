@@ -186,16 +186,16 @@ class BookingFlowIntegrationTest {
 	}
 
 	@Test
-	void paymentConfirmsTheBookingAndIsIdempotent() {
+	void paymentConfirmsTheBookingAndPayingTwiceChargesOnce() {
 		long alice = newUser();
 		String id = bookings.hold(alice, showId, List.of("G1", "G2")).bookingId();
 
-		BookingService.PaymentOutcome first = bookings.pay(alice, id, "key-" + id, upi("alice@okbank"));
-		BookingService.PaymentOutcome replay = bookings.pay(alice, id, "key-" + id, upi("alice@okbank"));
+		BookingService.PaymentOutcome first = bookings.pay(alice, id, upi("alice@okbank"));
+		BookingService.PaymentOutcome doubleClick = bookings.pay(alice, id, upi("alice@okbank"));
 
 		assertThat(first.succeeded()).isTrue();
 		assertThat(first.booking().status()).isEqualTo("CONFIRMED");
-		assertThat(replay.succeeded()).isTrue();
+		assertThat(doubleClick.succeeded()).isTrue();
 		assertThat(jdbc.queryForObject("select count(*) from payments where booking_id = ?", Integer.class, id)).isEqualTo(1);
 		assertThat(bookedSeats.findSeatIds(showId)).containsExactlyInAnyOrder("G1", "G2");
 		assertThat(holdStore.holders(showId, List.of("G1", "G2"))).isEmpty();
@@ -206,12 +206,12 @@ class BookingFlowIntegrationTest {
 		long alice = newUser();
 		String id = bookings.hold(alice, showId, List.of("H9")).bookingId();
 
-		BookingService.PaymentOutcome declined = bookings.pay(alice, id, UUID.randomUUID().toString(), upi("alice-fail@okbank"));
+		BookingService.PaymentOutcome declined = bookings.pay(alice, id, upi("alice-fail@okbank"));
 		assertThat(declined.succeeded()).isFalse();
 		assertThat(declined.booking().status()).isEqualTo("HELD");
 		assertThat(inventory.statuses(showId, null).get("H9")).isEqualTo(SeatStatus.HELD);
 
-		BookingService.PaymentOutcome retry = bookings.pay(alice, id, UUID.randomUUID().toString(), upi("alice@okbank"));
+		BookingService.PaymentOutcome retry = bookings.pay(alice, id, upi("alice@okbank"));
 		assertThat(retry.succeeded()).isTrue();
 	}
 
@@ -222,7 +222,7 @@ class BookingFlowIntegrationTest {
 
 		clock.advance(Duration.ofMinutes(11));
 
-		assertThatThrownBy(() -> bookings.pay(alice, id, UUID.randomUUID().toString(), upi("alice@okbank")))
+		assertThatThrownBy(() -> bookings.pay(alice, id, upi("alice@okbank")))
 				.isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("HOLD_EXPIRED"));
 		expiryJob.expireLapsedHolds();
 		assertThat(bookingRepository.findById(id)).get().extracting(Booking::getStatus).isEqualTo(BookingStatus.EXPIRED);
@@ -241,9 +241,9 @@ class BookingFlowIntegrationTest {
 		redis.delete("hold:{" + showId + "}:D5");
 
 		String bobsBooking = bookings.hold(bob, showId, List.of("D5")).bookingId();
-		assertThat(bookings.pay(bob, bobsBooking, UUID.randomUUID().toString(), upi("bob@okbank")).succeeded()).isTrue();
+		assertThat(bookings.pay(bob, bobsBooking, upi("bob@okbank")).succeeded()).isTrue();
 
-		assertThatThrownBy(() -> bookings.pay(alice, alicesBooking, UUID.randomUUID().toString(), upi("alice@okbank")))
+		assertThatThrownBy(() -> bookings.pay(alice, alicesBooking, upi("alice@okbank")))
 				.isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("HOLD_EXPIRED"));
 		assertThatThrownBy(() -> tx.executeWithoutResult(s -> bookedSeats.insert(showId, "D5", alicesBooking)))
 				.isInstanceOf(DataIntegrityViolationException.class);
@@ -253,7 +253,7 @@ class BookingFlowIntegrationTest {
 	void cancellingFreesTheSeatsUntilTwoHoursBeforeTheShow() {
 		long alice = newUser();
 		String id = bookings.hold(alice, showId, List.of("K1")).bookingId();
-		bookings.pay(alice, id, UUID.randomUUID().toString(), upi("alice@okbank"));
+		bookings.pay(alice, id, upi("alice@okbank"));
 
 		BookingResponse cancelled = bookings.cancel(alice, id);
 		assertThat(cancelled.status()).isEqualTo("CANCELLED");
@@ -261,7 +261,7 @@ class BookingFlowIntegrationTest {
 		assertThat(inventory.statuses(showId, null).get("K1")).isEqualTo(SeatStatus.AVAILABLE);
 
 		String second = bookings.hold(alice, showId, List.of("K2")).bookingId();
-		bookings.pay(alice, second, UUID.randomUUID().toString(), upi("alice@okbank"));
+		bookings.pay(alice, second, upi("alice@okbank"));
 		Instant startsAt = jdbc.queryForObject("select starts_at from shows where id = ?", java.sql.Timestamp.class, showId).toInstant();
 		clock.advance(Duration.between(clock.instant(), startsAt.minus(Duration.ofMinutes(90))));
 

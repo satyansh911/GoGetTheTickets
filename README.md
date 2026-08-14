@@ -4,7 +4,7 @@ A movie ticket booking app: browse what's playing in your city, pick a showtime,
 
 **Backend:** Java 21 · Spring Boot 4 (Web MVC, Data JPA, Security, Validation, Actuator) · PostgreSQL + Flyway · Redis · JWT
 **Frontend:** React 19 · TypeScript · Vite · TanStack Query · React Router
-**Quality & delivery:** JUnit 5 · Mockito · MockMvc · Testcontainers · Playwright (manual e2e) · Docker · GitHub Actions · Render
+**Quality & delivery:** JUnit 5 · Testcontainers · Playwright (manual e2e) · Docker · GitHub Actions · Render
 
 > All movies, cinemas and people are fictional, and payments are simulated. The UI follows a custom design system (dark and light themes, desktop and mobile).
 
@@ -17,7 +17,7 @@ A movie ticket booking app: browse what's playing in your city, pick a showtime,
   - The map refreshes every few seconds, and if someone takes a seat you selected, you're told immediately.
   - Pinch or ⌘-scroll to zoom.
 - **Checkout:** a 10-minute seat hold with a countdown, food and drinks, coupons (`GGTFIRST`: first booking only; `POPCORN50`: needs food), and a live price breakdown.
-- **Payment (demo):** UPI, card and netbanking forms, success and decline paths, and an idempotent retry.
+- **Payment (demo):** UPI, card and netbanking forms, success and decline paths, and retry after a decline.
 - **Tickets:** a QR ticket, an "Add to calendar" (.ics) download, and My Bookings (upcoming / past).
 - **Cancellation:** allowed until 2 hours before the show. You're refunded everything except the fee and GST, and the seats are released.
 - **Accounts:** sign up / sign in (BCrypt + JWT), plus a profile page with dark / light / auto theme.
@@ -43,8 +43,7 @@ All seats in a request are held by **one Lua script**, which Redis runs atomical
 So once a hold succeeds, any earlier sale of those seats is already visible to it.
 
 **Other safeguards:**
-- **Idempotent payments:** every attempt carries an `Idempotency-Key` stored under a unique constraint, so a double click or network retry never charges twice.
-- **Optimistic locking:** `@Version` on bookings means two concurrent changes to one booking can't both win.
+- **No double charge:** paying for a booking that's already confirmed (e.g. a double click) returns the existing booking instead of charging again.
 - **Rollback cleanup:** if a hold's database transaction rolls back, a transaction hook releases the Redis keys straight away instead of leaving the seats blocked for 10 minutes.
 
 ## Booking lifecycle
@@ -89,7 +88,7 @@ React SPA ──/api──▶ Controllers ──▶ Services (business rules) �
 | `POST /api/shows/{id}/holds` | ✓ | Hold seats all-or-nothing → `409 SEATS_UNAVAILABLE` names taken seats |
 | `GET /api/bookings?scope=upcoming\|past`, `GET /api/bookings/{id}` | ✓ | My bookings |
 | `PUT /api/bookings/{id}/items`, `PUT`/`DELETE /api/bookings/{id}/coupon` | ✓ | Food and coupons (`410 HOLD_EXPIRED` once the timer ends) |
-| `POST /api/bookings/{id}/payments` + `Idempotency-Key` | ✓ | `200` confirmed, `402 PAYMENT_DECLINED` (seats stay held) |
+| `POST /api/bookings/{id}/payments` | ✓ | `200` confirmed, `402 PAYMENT_DECLINED` (seats stay held) |
 | `DELETE /api/bookings/{id}/hold`, `POST /api/bookings/{id}/cancel` | ✓ | Release a hold; cancel a booking |
 
 ## Running locally
@@ -114,8 +113,7 @@ Prefer long-lived databases? Run `docker compose up -d` (Postgres, Redis, and Re
 
 | Test | Covers |
 |---|---|
-| `BookingFlowIntegrationTest` | Real Postgres + Redis. Covers: <br>• **200 users racing for the same seats: exactly one wins** <br>• overlapping requests are all-or-nothing <br>• idempotent payment <br>• a declined payment keeps the hold <br>• an expired hold can't be paid <br>• **a lost Redis hold still can't cause a double sale** <br>• cancellation rules <br>• the schedule never double-books a screen |
-| `BookingControllerTest` | The HTTP contract: 401 without a token, 201/402/409 bodies, validation messages, the Idempotency-Key requirement |
+| `BookingFlowIntegrationTest` | Real Postgres + Redis. Covers: <br>• **200 users racing for the same seats: exactly one wins** <br>• overlapping requests are all-or-nothing <br>• paying twice charges once <br>• a declined payment keeps the hold <br>• an expired hold can't be paid <br>• **a lost Redis hold still can't cause a double sale** <br>• cancellation rules <br>• the schedule never double-books a screen |
 | `PricingTest` | Fee, GST rounding, coupon caps and rules |
 
 CI runs the backend suite plus the frontend lint and build on every push.

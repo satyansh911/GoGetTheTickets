@@ -18,7 +18,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "bookings")
@@ -60,13 +59,6 @@ public class Booking {
 	private Instant confirmedAt;
 
 	private Instant cancelledAt;
-
-	/**
-	 * Optimistic lock: two concurrent writes to one booking can't both win. A wrapper type, so
-	 * a new booking (version null) is inserted rather than merged.
-	 */
-	@Version
-	private Integer version;
 
 	@ElementCollection(fetch = FetchType.EAGER)
 	@CollectionTable(name = "booking_seats", joinColumns = @JoinColumn(name = "booking_id"))

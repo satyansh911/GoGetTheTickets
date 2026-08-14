@@ -12,7 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,13 +44,6 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException e) {
 		return ResponseEntity.badRequest().body(ApiError.of("Request body is missing or malformed"));
-	}
-
-	// Two requests changed the same booking at once; the loser retries.
-	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-	ResponseEntity<ApiError> handleConcurrentUpdate(ObjectOptimisticLockingFailureException e) {
-		return ResponseEntity.status(HttpStatus.CONFLICT)
-				.body(new ApiError("This booking was just updated. Refresh and try again.", "CONCURRENT_UPDATE", null, null));
 	}
 
 	/**

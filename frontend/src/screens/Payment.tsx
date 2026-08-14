@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router'
 import { HoldBar, HoldExpiredDialog, OrderSummary, useHoldCountdown } from '../components/booking'
@@ -38,7 +38,6 @@ function PaymentInner() {
   const [step, setStep] = useState<number | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [serverSaysExpired, setExpired] = useState(false)
-  const attemptKey = useRef<string | null>(null)
   const left = useHoldCountdown(booking?.status === 'HELD' ? booking.holdExpiresAt : null)
   // While a payment is in flight the server decides; don't pre-empt it at 00:00.
   const expired = serverSaysExpired || holdGone(booking) || (left === 0 && step == null)
@@ -79,15 +78,12 @@ function PaymentInner() {
       ...(method === 'netbanking' ? { bank } : {}),
       ...(outcome === 'fail' ? { simulate: 'FAIL' as const } : {}),
     }
-    // One key per attempt; kept across a network retry so the server can dedupe it.
-    attemptKey.current ??= crypto.randomUUID()
     setFailed(null)
     setStep(0)
     const timers = [700, 1500].map((ms, i) => setTimeout(() => setStep(s => (s == null ? s : Math.max(s, i + 1))), ms))
     const minDelay = new Promise(r => setTimeout(r, 2300))
     try {
-      const [confirmed] = await Promise.all([api.pay(id, body, attemptKey.current), minDelay])
-      attemptKey.current = null
+      const [confirmed] = await Promise.all([api.pay(id, body), minDelay])
       setStep(3)
       set(confirmed)
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
@@ -95,7 +91,6 @@ function PaymentInner() {
     } catch (e) {
       await minDelay
       const err = e as ApiError
-      if (err.code !== 'NETWORK') attemptKey.current = null
       if (err.code === 'PAYMENT_DECLINED') {
         if (err.details) set(err.details as Booking)
         setFailed(err.message)

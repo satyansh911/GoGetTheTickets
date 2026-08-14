@@ -40,7 +40,7 @@ export class ApiError extends Error {
 /** Fired on a 401 so the app can drop a stale token. */
 export const UNAUTHORIZED_EVENT = 'ggt:unauthorized'
 
-async function request<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getToken()
   let res: Response
   try {
@@ -49,7 +49,6 @@ async function request<T>(method: string, path: string, body?: unknown, headers:
       headers: {
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
@@ -100,7 +99,6 @@ export const api = {
   setItems: (id: string, items: Array<{ id: string; qty: number }>) => request<Booking>('PUT', `/bookings/${id}/items`, { items }),
   applyCoupon: (id: string, code: string) => request<Booking>('PUT', `/bookings/${id}/coupon`, { code }),
   removeCoupon: (id: string) => request<Booking>('DELETE', `/bookings/${id}/coupon`),
-  pay: (id: string, body: PaymentBody, idempotencyKey: string) =>
-    request<Booking>('POST', `/bookings/${id}/payments`, body, { 'Idempotency-Key': idempotencyKey }),
+  pay: (id: string, body: PaymentBody) => request<Booking>('POST', `/bookings/${id}/payments`, body),
   cancel: (id: string) => request<Booking>('POST', `/bookings/${id}/cancel`),
 }
